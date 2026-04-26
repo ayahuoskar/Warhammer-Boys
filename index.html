@@ -1,0 +1,1265 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>WARHAMMER BOYS – Battlefield Commander</title>
+  <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/howler/2.2.4/howler.min.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Creepster&family=MedievalSharp&family=UnifrakturMaguntia&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --blood: #8b0000;
+      --blood-bright: #cc0000;
+      --gold: #b8860b;
+      --gold-bright: #ffd700;
+      --parchment: #c8a96e;
+      --dark: #0a0a0a;
+      --panel: rgba(10,0,0,0.85);
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Creepster', cursive;
+      background: #000;
+      color: #ccc;
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* ── Background cycling ── */
+    .bg-slideshow {
+      position: fixed;
+      inset: 0;
+      z-index: 0;
+    }
+    .bg-slide {
+      position: absolute;
+      inset: 0;
+      background-size: cover;
+      background-position: center;
+      opacity: 0;
+      transition: opacity 2s ease-in-out;
+    }
+    .bg-slide.active { opacity: 1; }
+    /* Replace these URLs with your own 40k artwork */
+    .bg-slide:nth-child(1) { background-image: url('https://images.unsplash.com/photo-1578662996442-48f60103fc96?w=1920&q=80'); }
+    .bg-slide:nth-child(2) { background-image: url('https://images.unsplash.com/photo-1533134486753-c833f0ed4866?w=1920&q=80'); }
+    .bg-slide:nth-child(3) { background-image: url('https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=1920&q=80'); }
+    .bg-slide:nth-child(4) { background-image: url('https://images.unsplash.com/photo-1504701954957-2010ec3bcec1?w=1920&q=80'); }
+
+    .bg-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 1;
+      background: radial-gradient(ellipse at center, rgba(0,0,0,0.55) 0%, rgba(0,0,0,0.88) 100%);
+    }
+
+    /* ── Main layout ── */
+    #app {
+      position: relative;
+      z-index: 2;
+      display: flex;
+      flex-direction: column;
+      min-height: 100vh;
+      padding-bottom: 160px;
+    }
+
+    /* ── Header ── */
+    .site-header {
+      text-align: center;
+      padding: 28px 16px 18px;
+      border-bottom: 2px solid var(--blood);
+      background: rgba(0,0,0,0.7);
+      position: relative;
+    }
+    .site-header::before,
+    .site-header::after {
+      content: '☠';
+      position: absolute;
+      top: 50%;
+      transform: translateY(-50%);
+      font-size: 2.4rem;
+      color: var(--blood-bright);
+      filter: drop-shadow(0 0 8px var(--blood-bright));
+    }
+    .site-header::before { left: 24px; }
+    .site-header::after  { right: 24px; }
+
+    .main-title {
+      font-family: 'UnifrakturMaguntia', cursive;
+      font-size: clamp(2.2rem, 7vw, 5rem);
+      color: var(--blood-bright);
+      text-shadow:
+        0 0 10px var(--blood-bright),
+        0 0 30px var(--blood),
+        0 0 60px #400000,
+        2px 2px 0 #000;
+      letter-spacing: 2px;
+      line-height: 1.1;
+    }
+    .sub-title {
+      font-family: 'Creepster', cursive;
+      font-size: clamp(0.85rem, 2.5vw, 1.2rem);
+      color: var(--parchment);
+      letter-spacing: 4px;
+      text-transform: uppercase;
+      margin-top: 4px;
+      text-shadow: 0 0 8px rgba(200,169,110,0.5);
+    }
+
+    /* ── Two-column layout ── */
+    .main-panels {
+      display: flex;
+      flex: 1;
+      gap: 0;
+      padding: 16px;
+      gap: 16px;
+    }
+    @media (max-width: 768px) {
+      .main-panels { flex-direction: column; padding: 10px; gap: 12px; }
+      .site-header::before, .site-header::after { display: none; }
+    }
+
+    /* ── Panel base ── */
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--blood);
+      border-radius: 4px;
+      box-shadow:
+        0 0 0 1px #000,
+        inset 0 0 30px rgba(139,0,0,0.1),
+        0 4px 32px rgba(0,0,0,0.8);
+      backdrop-filter: blur(6px);
+      overflow: hidden;
+    }
+    .panel-header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 12px 16px;
+      background: linear-gradient(90deg, rgba(139,0,0,0.5) 0%, rgba(0,0,0,0) 100%);
+      border-bottom: 1px solid var(--blood);
+    }
+    .panel-header h2 {
+      font-family: 'Creepster', cursive;
+      font-size: 1.3rem;
+      color: var(--parchment);
+      letter-spacing: 2px;
+      text-shadow: 0 0 8px var(--blood-bright);
+      text-transform: uppercase;
+    }
+    .panel-icon { font-size: 1.4rem; }
+
+    /* Left panel */
+    .ambient-panel { flex: 1 1 55%; }
+    /* Right panel */
+    .soundboard-panel { flex: 1 1 45%; }
+
+    .panel-body { padding: 12px; overflow-y: auto; max-height: 72vh; }
+    @media (max-width: 768px) {
+      .panel-body { max-height: none; overflow-y: visible; }
+    }
+
+    /* ── Scrollbar ── */
+    .panel-body::-webkit-scrollbar { width: 6px; }
+    .panel-body::-webkit-scrollbar-track { background: #0a0a0a; }
+    .panel-body::-webkit-scrollbar-thumb { background: var(--blood); border-radius: 3px; }
+
+    /* ── Ambient channel row ── */
+    .channel {
+      background: rgba(0,0,0,0.5);
+      border: 1px solid rgba(139,0,0,0.3);
+      border-radius: 3px;
+      padding: 10px 12px;
+      margin-bottom: 8px;
+      transition: border-color 0.2s, background 0.2s;
+    }
+    .channel.playing {
+      border-color: var(--blood-bright);
+      background: rgba(139,0,0,0.12);
+      box-shadow: 0 0 10px rgba(204,0,0,0.2);
+    }
+    .channel-top {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 8px;
+    }
+    .channel-name {
+      flex: 1;
+      font-family: 'Creepster', cursive;
+      font-size: 1rem;
+      color: var(--parchment);
+      letter-spacing: 1px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .channel.playing .channel-name {
+      color: #ff4444;
+      text-shadow: 0 0 6px rgba(255,68,68,0.5);
+    }
+
+    /* Toggle play button */
+    .btn-toggle {
+      width: 40px;
+      height: 40px;
+      min-width: 40px;
+      border-radius: 50%;
+      border: 2px solid var(--blood);
+      background: rgba(139,0,0,0.2);
+      color: var(--parchment);
+      font-size: 1rem;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.15s;
+      user-select: none;
+    }
+    .btn-toggle:hover { background: rgba(139,0,0,0.45); border-color: var(--blood-bright); }
+    .btn-toggle.active {
+      background: var(--blood-bright);
+      border-color: #ff6666;
+      color: #fff;
+      box-shadow: 0 0 12px rgba(204,0,0,0.7);
+    }
+    .btn-toggle:active { transform: scale(0.92); }
+
+    /* Pulse dot */
+    .pulse-dot {
+      width: 10px; height: 10px;
+      border-radius: 50%;
+      background: #333;
+      min-width: 10px;
+      transition: background 0.2s;
+    }
+    .channel.playing .pulse-dot {
+      background: var(--blood-bright);
+      box-shadow: 0 0 6px var(--blood-bright);
+      animation: pulse 1s infinite;
+    }
+    @keyframes pulse {
+      0%,100% { opacity: 1; transform: scale(1); }
+      50%      { opacity: 0.5; transform: scale(0.7); }
+    }
+
+    /* Sliders row */
+    .sliders-row {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+    }
+    .slider-group {
+      display: flex;
+      flex-direction: column;
+      flex: 1;
+      gap: 3px;
+    }
+    .slider-label {
+      font-size: 0.68rem;
+      color: #888;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      display: flex;
+      justify-content: space-between;
+    }
+    .slider-label span { color: var(--parchment); font-size: 0.7rem; }
+
+    input[type=range] {
+      -webkit-appearance: none;
+      width: 100%;
+      height: 6px;
+      border-radius: 3px;
+      outline: none;
+      cursor: pointer;
+    }
+    input[type=range].vol-slider {
+      background: linear-gradient(to right, var(--blood-bright) 0%, var(--blood-bright) var(--val, 80%), #333 var(--val, 80%), #333 100%);
+    }
+    input[type=range].pan-slider {
+      background: linear-gradient(to right, #2255aa 0%, #2255aa var(--val, 50%), #1a1a1a var(--val, 50%), #1a1a1a 100%);
+    }
+    input[type=range]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 14px; height: 14px;
+      border-radius: 50%;
+      background: var(--parchment);
+      border: 2px solid var(--blood-bright);
+      box-shadow: 0 0 4px rgba(204,0,0,0.5);
+      transition: transform 0.1s;
+    }
+    input[type=range]::-webkit-slider-thumb:hover { transform: scale(1.2); }
+    input[type=range]::-moz-range-thumb {
+      width: 14px; height: 14px;
+      border-radius: 50%;
+      background: var(--parchment);
+      border: 2px solid var(--blood-bright);
+    }
+
+    /* ── Soundboard ── */
+    .soundboard-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+    @media (max-width: 480px) {
+      .soundboard-grid { grid-template-columns: 1fr; }
+    }
+
+    .sfx-card {
+      background: rgba(0,0,0,0.55);
+      border: 1px solid rgba(139,0,0,0.35);
+      border-radius: 3px;
+      padding: 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      transition: border-color 0.15s, background 0.15s;
+    }
+    .sfx-card:hover {
+      border-color: var(--blood-bright);
+      background: rgba(139,0,0,0.1);
+    }
+
+    .btn-sfx {
+      width: 100%;
+      padding: 12px 8px;
+      background: linear-gradient(135deg, rgba(139,0,0,0.6) 0%, rgba(80,0,0,0.8) 100%);
+      border: 1px solid var(--blood);
+      border-bottom: 3px solid #500000;
+      border-radius: 3px;
+      color: var(--parchment);
+      font-family: 'Creepster', cursive;
+      font-size: 0.95rem;
+      letter-spacing: 1px;
+      cursor: pointer;
+      text-align: center;
+      text-transform: uppercase;
+      transition: all 0.1s;
+      user-select: none;
+      line-height: 1.2;
+    }
+    .btn-sfx:hover {
+      background: linear-gradient(135deg, rgba(204,0,0,0.7) 0%, rgba(139,0,0,0.9) 100%);
+      border-color: var(--blood-bright);
+      color: #fff;
+      box-shadow: 0 0 12px rgba(204,0,0,0.4);
+    }
+    .btn-sfx:active {
+      transform: translateY(2px);
+      border-bottom-width: 1px;
+      box-shadow: none;
+    }
+    .btn-sfx.flash {
+      background: linear-gradient(135deg, #cc0000 0%, #880000 100%);
+      color: #fff;
+      box-shadow: 0 0 20px rgba(255,0,0,0.6);
+    }
+
+    .sfx-sliders { display: flex; flex-direction: column; gap: 5px; }
+
+    /* ── Bottom bar ── */
+    .bottom-bar {
+      position: fixed;
+      bottom: 0; left: 0; right: 0;
+      z-index: 50;
+      background: rgba(5,0,0,0.97);
+      border-top: 2px solid var(--blood);
+      box-shadow: 0 -4px 30px rgba(139,0,0,0.3);
+      padding: 10px 16px;
+    }
+
+    .bottom-row {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 10px;
+      max-width: 1400px;
+      margin: 0 auto;
+    }
+
+    .master-vol {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex: 1 1 160px;
+      min-width: 140px;
+    }
+    .master-vol label {
+      font-family: 'Creepster', cursive;
+      font-size: 0.85rem;
+      color: var(--parchment);
+      white-space: nowrap;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+    }
+    .master-vol input { flex: 1; }
+
+    .btn-bar {
+      padding: 9px 14px;
+      border-radius: 3px;
+      font-family: 'Creepster', cursive;
+      font-size: 0.9rem;
+      letter-spacing: 1px;
+      cursor: pointer;
+      border: 1px solid;
+      transition: all 0.15s;
+      text-transform: uppercase;
+      white-space: nowrap;
+      user-select: none;
+    }
+    .btn-bar:active { transform: scale(0.95); }
+
+    .btn-fade-in {
+      background: rgba(0,80,0,0.5);
+      border-color: #006600;
+      color: #88cc88;
+    }
+    .btn-fade-in:hover { background: rgba(0,120,0,0.6); border-color: #00aa00; color: #aaffaa; }
+
+    .btn-fade-out {
+      background: rgba(60,0,0,0.5);
+      border-color: var(--blood);
+      color: #cc8888;
+    }
+    .btn-fade-out:hover { background: rgba(100,0,0,0.6); border-color: var(--blood-bright); color: #ffaaaa; }
+
+    .preset-select {
+      background: rgba(0,0,0,0.8);
+      border: 1px solid var(--blood);
+      border-radius: 3px;
+      color: var(--parchment);
+      font-family: 'Creepster', cursive;
+      font-size: 0.9rem;
+      padding: 8px 10px;
+      cursor: pointer;
+      letter-spacing: 1px;
+      flex: 1 1 180px;
+      max-width: 220px;
+    }
+    .preset-select option { background: #0a0000; }
+
+    .btn-perils {
+      background: linear-gradient(135deg, #8b0000 0%, #4a0000 100%);
+      border: 2px solid var(--blood-bright);
+      border-bottom: 4px solid #500000;
+      color: #fff;
+      font-family: 'UnifrakturMaguntia', cursive;
+      font-size: 1rem;
+      padding: 9px 18px;
+      border-radius: 3px;
+      cursor: pointer;
+      text-shadow: 0 0 8px rgba(255,0,0,0.7);
+      box-shadow: 0 0 14px rgba(204,0,0,0.4);
+      transition: all 0.15s;
+      white-space: nowrap;
+      letter-spacing: 1px;
+    }
+    .btn-perils:hover {
+      background: linear-gradient(135deg, #cc0000 0%, #800000 100%);
+      box-shadow: 0 0 25px rgba(255,0,0,0.6);
+      transform: scale(1.03);
+    }
+    .btn-perils:active { transform: scale(0.96) translateY(2px); border-bottom-width: 2px; }
+
+    .btn-save {
+      background: rgba(184,134,11,0.2);
+      border-color: var(--gold);
+      color: var(--gold-bright);
+    }
+    .btn-save:hover { background: rgba(184,134,11,0.4); }
+
+    .btn-load {
+      background: rgba(30,30,80,0.4);
+      border-color: #4444aa;
+      color: #aaaaff;
+    }
+    .btn-load:hover { background: rgba(50,50,120,0.5); }
+
+    /* ── Skull dividers ── */
+    .skull-divider {
+      text-align: center;
+      color: rgba(139,0,0,0.4);
+      font-size: 0.85rem;
+      letter-spacing: 6px;
+      margin: 6px 0;
+      user-select: none;
+    }
+
+    /* ── Toast ── */
+    #toast {
+      position: fixed;
+      top: 24px; left: 50%; transform: translateX(-50%);
+      z-index: 200;
+      background: rgba(5,0,0,0.95);
+      border: 1px solid var(--blood-bright);
+      color: var(--parchment);
+      font-family: 'Creepster', cursive;
+      font-size: 1rem;
+      padding: 10px 22px;
+      border-radius: 3px;
+      box-shadow: 0 0 20px rgba(204,0,0,0.4);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.3s;
+      letter-spacing: 1px;
+      white-space: nowrap;
+    }
+    #toast.show { opacity: 1; }
+
+    /* ── Warp flash ── */
+    #warp-flash {
+      position: fixed; inset: 0;
+      z-index: 100;
+      background: radial-gradient(ellipse at center, rgba(180,0,255,0.4) 0%, rgba(255,0,0,0.3) 50%, transparent 80%);
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.1s;
+    }
+    #warp-flash.show { opacity: 1; }
+
+    /* ── Separator ── */
+    .section-sep {
+      height: 1px;
+      background: linear-gradient(90deg, transparent, var(--blood), transparent);
+      margin: 10px 0;
+    }
+
+    /* ── Warhammer Boys brand badge ── */
+    .brand-badge {
+      display: inline-block;
+      background: rgba(139,0,0,0.25);
+      border: 1px solid var(--blood);
+      border-radius: 2px;
+      padding: 2px 10px;
+      font-family: 'Creepster', cursive;
+      font-size: 0.75rem;
+      letter-spacing: 3px;
+      color: var(--parchment);
+      text-transform: uppercase;
+      margin-top: 4px;
+    }
+  </style>
+</head>
+<body>
+
+<!-- Background slideshow -->
+<div class="bg-slideshow">
+  <div class="bg-slide active"></div>
+  <div class="bg-slide"></div>
+  <div class="bg-slide"></div>
+  <div class="bg-slide"></div>
+</div>
+<div class="bg-overlay"></div>
+
+<!-- Warp flash overlay -->
+<div id="warp-flash"></div>
+
+<!-- Toast notification -->
+<div id="toast">☠ Mix Saved ☠</div>
+
+<div id="app">
+
+  <!-- ═══════════════ HEADER ═══════════════ -->
+  <header class="site-header">
+    <div class="main-title">Warhammer Boys</div>
+    <div class="sub-title">☠ &nbsp; Battlefield Commander &nbsp; ☠ &nbsp; Warhammer 40,000 &nbsp; ☠</div>
+    <div class="brand-badge">☠ Grimdark Sound Mixer ☠</div>
+  </header>
+
+  <!-- ═══════════════ MAIN PANELS ═══════════════ -->
+  <div class="main-panels">
+
+    <!-- ══════ LEFT: AMBIENT MIXER ══════ -->
+    <div class="panel ambient-panel">
+      <div class="panel-header">
+        <span class="panel-icon">🔊</span>
+        <h2>Ambient Channels</h2>
+        <span style="margin-left:auto;font-size:0.75rem;color:#666;letter-spacing:1px;">LOOP</span>
+      </div>
+      <div class="panel-body" id="ambient-list">
+        <!-- Channels injected by JS -->
+      </div>
+    </div>
+
+    <!-- ══════ RIGHT: SOUNDBOARD ══════ -->
+    <div class="panel soundboard-panel">
+      <div class="panel-header">
+        <span class="panel-icon">💥</span>
+        <h2>Soundboard</h2>
+        <span style="margin-left:auto;font-size:0.75rem;color:#666;letter-spacing:1px;">ONE-SHOT</span>
+      </div>
+      <div class="panel-body">
+        <div class="skull-divider">☠ ☠ ☠</div>
+        <div class="soundboard-grid" id="sfx-grid">
+          <!-- SFX cards injected by JS -->
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /main-panels -->
+
+</div><!-- /app -->
+
+<!-- ═══════════════ BOTTOM BAR ═══════════════ -->
+<div class="bottom-bar">
+  <div class="bottom-row">
+
+    <!-- Master Vol -->
+    <div class="master-vol">
+      <label>⚙ Master</label>
+      <input type="range" id="master-vol" class="vol-slider" min="0" max="100" value="80" />
+      <span id="master-vol-val" style="font-family:'Creepster',cursive;color:var(--parchment);font-size:0.8rem;min-width:32px;">80%</span>
+    </div>
+
+    <!-- Fade buttons -->
+    <button class="btn-bar btn-fade-in" id="btn-fade-in">▲ Fade In</button>
+    <button class="btn-bar btn-fade-out" id="btn-fade-out">▼ Fade Out</button>
+
+    <!-- Presets -->
+    <select class="preset-select" id="preset-select">
+      <option value="">— Scene Preset —</option>
+      <option value="imperial_siege">Imperial Siege</option>
+      <option value="tyranid_swarm">Tyranid Swarm</option>
+      <option value="world_eaters">World Eaters Assault</option>
+      <option value="jungle_ambush">Jungle Ambush</option>
+      <option value="night_raid">Night Raid</option>
+      <option value="rain_of_fire">Rain of Fire</option>
+    </select>
+
+    <!-- Perils -->
+    <button class="btn-perils" id="btn-perils">☠ Perils of the Warp ☠</button>
+
+    <!-- Save / Load -->
+    <button class="btn-bar btn-save" id="btn-save">💾 Save Mix</button>
+    <button class="btn-bar btn-load" id="btn-load">📂 Load Mix</button>
+
+  </div>
+</div>
+
+<script>
+/* ═══════════════════════════════════════════
+   WARHAMMER BOYS – Battlefield Commander
+   Full Howler.js Grimdark Audio Mixer
+═══════════════════════════════════════════ */
+
+// ── Sound definitions ──────────────────────
+const AMBIENT_SOUNDS = [
+  { name: 'Distance Warcry',  file: 'Distance Warcy Ambient.mp3' },
+  { name: 'Djunggle',         file: 'Djunggle Ambient.mp3' },
+  { name: 'Fire Crackle',     file: 'Fire Crackle Ambient.mp3' },
+  { name: 'Forest II',        file: 'Forest 2 Ambient.mp3' },
+  { name: 'Forest III',       file: 'Forest 3 Ambient.mp3' },
+  { name: 'Forest',           file: 'Forest Ambient.mp3' },
+  { name: 'Near Battle II',   file: 'NEAR BATTLE 2 Ambient.mp3' },
+  { name: 'Near Battle',      file: 'NEAR BATTLE Ambient.mp3' },
+  { name: 'Night',            file: 'Night Ambient.mp3' },
+  { name: 'Rain',             file: 'Rain Ambient.mp3' },
+  { name: 'Suspense',         file: 'Suspense Ambient.mp3' },
+  { name: 'Water Dock',       file: 'Water Dock Ambient.mp3' },
+  { name: 'Wind II',          file: 'Wind Ambient 2.mp3' },
+  { name: 'Wind',             file: 'Wind Ambient.mp3' },
+];
+
+const SFX_SOUNDS = [
+  { name: 'Battle Start',     file: 'Battle start Hit.mp3' },
+  { name: 'Charge Up',        file: 'Charge Up Hit.mp3' },
+  { name: 'Close Hit II',     file: 'Close Hit 2.mp3' },
+  { name: 'Close Hit',        file: 'Close Hit.mp3' },
+  { name: 'Direct Hit',       file: 'Direct Hit.mp3' },
+  { name: 'Distance Cannon',  file: 'Distance Cannon Hit.mp3' },
+  { name: 'Distorted Fire',   file: 'Distorted Fire Hit.mp3' },
+  { name: 'Fire Blast',       file: 'Fire 1 Hit.mp3' },
+  { name: 'Sci-Fi Blast',     file: 'SCI FI BLAST Hit.mp3' },
+  { name: 'Tyranid Scream',   file: 'TYRANDIS Scream Hit.mp3' },
+  { name: 'World Eaters',     file: 'World Eaters Hit.mp3' },
+];
+
+const BASE = 'assets/sounds/';
+
+// ── State ──────────────────────────────────
+const ambientState = [];  // { howl, playing, vol, pan }
+const sfxState     = [];  // { howl, vol, pan }
+
+let masterVolume = 0.8;
+
+// ── Utility ───────────────────────────────
+function encodeFile(f) { return f.split(' ').join('%20'); }
+
+function showToast(msg, duration=2200) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), duration);
+}
+
+function warpFlash() {
+  const el = document.getElementById('warp-flash');
+  el.classList.add('show');
+  setTimeout(() => el.classList.remove('show'), 500);
+}
+
+// ── Background slideshow ──────────────────
+let bgIndex = 0;
+const bgSlides = document.querySelectorAll('.bg-slide');
+function cycleBg() {
+  bgSlides[bgIndex].classList.remove('active');
+  bgIndex = (bgIndex + 1) % bgSlides.length;
+  bgSlides[bgIndex].classList.add('active');
+}
+setInterval(cycleBg, 8000);
+
+// ── Build Howl for ambient ────────────────
+function buildAmbientHowl(file, vol, pan) {
+  return new Howl({
+    src: [BASE + encodeFile(file)],
+    loop: true,
+    volume: vol * masterVolume,
+    stereo: pan,
+    html5: false,
+  });
+}
+
+// ── Build Howl for SFX ───────────────────
+function buildSfxHowl(file) {
+  return new Howl({
+    src: [BASE + encodeFile(file)],
+    loop: false,
+    volume: 1.0,
+    html5: false,
+  });
+}
+
+// ── Render Ambient Panel ─────────────────
+function renderAmbient() {
+  const list = document.getElementById('ambient-list');
+  list.innerHTML = '';
+
+  AMBIENT_SOUNDS.forEach((s, i) => {
+    const state = { howl: null, playing: false, vol: 0.7, pan: 0 };
+    ambientState.push(state);
+
+    const row = document.createElement('div');
+    row.className = 'channel';
+    row.id = `ch-${i}`;
+
+    row.innerHTML = `
+      <div class="channel-top">
+        <div class="pulse-dot" id="dot-${i}"></div>
+        <button class="btn-toggle" id="tog-${i}" title="Play/Stop">▶</button>
+        <div class="channel-name">${s.name}</div>
+      </div>
+      <div class="sliders-row">
+        <div class="slider-group">
+          <div class="slider-label">
+            Vol
+            <span id="vol-val-${i}">70%</span>
+          </div>
+          <input type="range" class="vol-slider" id="vol-${i}"
+                 min="0" max="100" value="70"
+                 style="--val:70%" />
+        </div>
+        <div class="slider-group">
+          <div class="slider-label">
+            Pan
+            <span id="pan-val-${i}">C</span>
+          </div>
+          <input type="range" class="pan-slider" id="pan-${i}"
+                 min="-100" max="100" value="0"
+                 style="--val:50%" />
+        </div>
+      </div>
+    `;
+    list.appendChild(row);
+
+    if (i < AMBIENT_SOUNDS.length - 1) {
+      const sep = document.createElement('div');
+      sep.className = 'section-sep';
+      list.appendChild(sep);
+    }
+
+    // Toggle button
+    row.querySelector(`#tog-${i}`).addEventListener('click', () => toggleAmbient(i));
+
+    // Volume slider
+    const volSlider = row.querySelector(`#vol-${i}`);
+    volSlider.addEventListener('input', () => {
+      const v = parseInt(volSlider.value);
+      state.vol = v / 100;
+      document.getElementById(`vol-val-${i}`).textContent = v + '%';
+      const pct = v + '%';
+      volSlider.style.setProperty('--val', pct);
+      if (state.howl) state.howl.volume(state.vol * masterVolume);
+    });
+
+    // Pan slider
+    const panSlider = row.querySelector(`#pan-${i}`);
+    panSlider.addEventListener('input', () => {
+      const p = parseInt(panSlider.value);
+      state.pan = p / 100;
+      const label = p === 0 ? 'C' : (p < 0 ? 'L' + Math.abs(p) : 'R' + p);
+      document.getElementById(`pan-val-${i}`).textContent = label;
+      const pct = ((p + 100) / 2) + '%';
+      panSlider.style.setProperty('--val', pct);
+      if (state.howl) state.howl.stereo(state.pan);
+    });
+  });
+}
+
+// ── Toggle ambient channel ────────────────
+function toggleAmbient(i) {
+  const state = ambientState[i];
+  const btn   = document.getElementById(`tog-${i}`);
+  const row   = document.getElementById(`ch-${i}`);
+
+  if (state.playing) {
+    // Stop
+    if (state.howl) { state.howl.fade(state.howl.volume(), 0, 400); setTimeout(() => { if(state.howl) state.howl.stop(); }, 410); }
+    state.playing = false;
+    btn.textContent = '▶';
+    btn.classList.remove('active');
+    row.classList.remove('playing');
+  } else {
+    // Play
+    if (!state.howl) {
+      state.howl = buildAmbientHowl(AMBIENT_SOUNDS[i].file, state.vol, state.pan);
+    }
+    state.howl.volume(0);
+    state.howl.play();
+    state.howl.fade(0, state.vol * masterVolume, 600);
+    state.playing = true;
+    btn.textContent = '■';
+    btn.classList.add('active');
+    row.classList.add('playing');
+  }
+}
+
+// ── Render SFX Soundboard ─────────────────
+function renderSfx() {
+  const grid = document.getElementById('sfx-grid');
+  grid.innerHTML = '';
+
+  SFX_SOUNDS.forEach((s, i) => {
+    const state = { howl: null, vol: 1.0, pan: 0 };
+    sfxState.push(state);
+
+    // Pre-load SFX howl
+    state.howl = buildSfxHowl(s.file);
+
+    const card = document.createElement('div');
+    card.className = 'sfx-card';
+    card.innerHTML = `
+      <button class="btn-sfx" id="sfx-btn-${i}">☠ ${s.name}</button>
+      <div class="sfx-sliders">
+        <div class="slider-group">
+          <div class="slider-label">
+            Vol
+            <span id="sfx-vol-val-${i}">100%</span>
+          </div>
+          <input type="range" class="vol-slider" id="sfx-vol-${i}"
+                 min="0" max="100" value="100"
+                 style="--val:100%" />
+        </div>
+        <div class="slider-group">
+          <div class="slider-label">
+            Pan
+            <span id="sfx-pan-val-${i}">C</span>
+          </div>
+          <input type="range" class="pan-slider" id="sfx-pan-${i}"
+                 min="-100" max="100" value="0"
+                 style="--val:50%" />
+        </div>
+      </div>
+    `;
+    grid.appendChild(card);
+
+    // Fire button
+    card.querySelector(`#sfx-btn-${i}`).addEventListener('click', () => fireSfx(i));
+
+    // SFX Volume
+    const sfxVol = card.querySelector(`#sfx-vol-${i}`);
+    sfxVol.addEventListener('input', () => {
+      const v = parseInt(sfxVol.value);
+      state.vol = v / 100;
+      document.getElementById(`sfx-vol-val-${i}`).textContent = v + '%';
+      sfxVol.style.setProperty('--val', v + '%');
+    });
+
+    // SFX Pan
+    const sfxPan = card.querySelector(`#sfx-pan-${i}`);
+    sfxPan.addEventListener('input', () => {
+      const p = parseInt(sfxPan.value);
+      state.pan = p / 100;
+      const label = p === 0 ? 'C' : (p < 0 ? 'L' + Math.abs(p) : 'R' + p);
+      document.getElementById(`sfx-pan-val-${i}`).textContent = label;
+      sfxPan.style.setProperty('--val', ((p + 100) / 2) + '%');
+    });
+  });
+}
+
+// ── Fire one-shot SFX ─────────────────────
+function fireSfx(i) {
+  const state = sfxState[i];
+  const btn   = document.getElementById(`sfx-btn-${i}`);
+
+  // Create a fresh Howl each time so overlaps work
+  const h = new Howl({
+    src: [BASE + encodeFile(SFX_SOUNDS[i].file)],
+    loop: false,
+    volume: state.vol * masterVolume,
+    stereo: state.pan,
+  });
+  h.play();
+
+  btn.classList.add('flash');
+  setTimeout(() => btn.classList.remove('flash'), 300);
+}
+
+// ── Master Volume ─────────────────────────
+document.getElementById('master-vol').addEventListener('input', function() {
+  masterVolume = parseInt(this.value) / 100;
+  document.getElementById('master-vol-val').textContent = this.value + '%';
+  this.style.setProperty('--val', this.value + '%');
+  Howler.volume(masterVolume);
+});
+// Init slider gradient
+document.getElementById('master-vol').style.setProperty('--val', '80%');
+
+// ── Global Fade In ────────────────────────
+document.getElementById('btn-fade-in').addEventListener('click', () => {
+  ambientState.forEach((state, i) => {
+    if (!state.playing) {
+      if (!state.howl) state.howl = buildAmbientHowl(AMBIENT_SOUNDS[i].file, state.vol, state.pan);
+      state.howl.volume(0);
+      state.howl.play();
+      state.howl.fade(0, state.vol * masterVolume, 3000);
+      state.playing = true;
+      document.getElementById(`tog-${i}`).textContent = '■';
+      document.getElementById(`tog-${i}`).classList.add('active');
+      document.getElementById(`ch-${i}`).classList.add('playing');
+    } else {
+      if (state.howl) state.howl.fade(state.howl.volume(), state.vol * masterVolume, 3000);
+    }
+  });
+  showToast('☠ All ambients fading in ☠');
+});
+
+// ── Global Fade Out ───────────────────────
+document.getElementById('btn-fade-out').addEventListener('click', () => {
+  ambientState.forEach((state, i) => {
+    if (state.playing && state.howl) {
+      state.howl.fade(state.howl.volume(), 0, 3000);
+      setTimeout(() => {
+        if (state.howl) state.howl.stop();
+        state.playing = false;
+        document.getElementById(`tog-${i}`).textContent = '▶';
+        document.getElementById(`tog-${i}`).classList.remove('active');
+        document.getElementById(`ch-${i}`).classList.remove('playing');
+      }, 3100);
+    }
+  });
+  showToast('☠ All ambients fading out ☠');
+});
+
+// ── Scene Presets ─────────────────────────
+const PRESETS = {
+  imperial_siege: {
+    name: '⚔ Imperial Siege',
+    ambients: {
+      'Near Battle':    { vol: 90, pan: 0  },
+      'Near Battle II': { vol: 75, pan: -30 },
+      'Distance Warcry':{ vol: 60, pan: 40  },
+      'Fire Crackle':   { vol: 50, pan: 10  },
+      'Wind':           { vol: 30, pan: 0   },
+    }
+  },
+  tyranid_swarm: {
+    name: '🦟 Tyranid Swarm',
+    ambients: {
+      'Djunggle':       { vol: 80, pan: 0   },
+      'Near Battle':    { vol: 65, pan: 20  },
+      'Suspense':       { vol: 70, pan: 0   },
+      'Distance Warcry':{ vol: 55, pan: -20 },
+      'Forest':         { vol: 40, pan: -40 },
+    }
+  },
+  world_eaters: {
+    name: '💀 World Eaters Assault',
+    ambients: {
+      'Near Battle II': { vol: 95, pan: 0   },
+      'Near Battle':    { vol: 85, pan: 30  },
+      'Distance Warcry':{ vol: 70, pan: -30 },
+      'Fire Crackle':   { vol: 60, pan: 20  },
+      'Suspense':       { vol: 45, pan: 0   },
+    }
+  },
+  jungle_ambush: {
+    name: '🌿 Jungle Ambush',
+    ambients: {
+      'Djunggle':       { vol: 85, pan: 0   },
+      'Forest':         { vol: 70, pan: -30 },
+      'Forest II':      { vol: 60, pan: 30  },
+      'Forest III':     { vol: 55, pan: 0   },
+      'Night':          { vol: 40, pan: 0   },
+    }
+  },
+  night_raid: {
+    name: '🌙 Night Raid',
+    ambients: {
+      'Night':          { vol: 85, pan: 0   },
+      'Wind':           { vol: 50, pan: -20 },
+      'Wind II':        { vol: 45, pan: 20  },
+      'Suspense':       { vol: 65, pan: 0   },
+      'Distance Warcry':{ vol: 40, pan: 30  },
+    }
+  },
+  rain_of_fire: {
+    name: '🔥 Rain of Fire',
+    ambients: {
+      'Rain':           { vol: 80, pan: 0   },
+      'Fire Crackle':   { vol: 75, pan: 20  },
+      'Near Battle':    { vol: 65, pan: -10 },
+      'Wind':           { vol: 40, pan: 0   },
+      'Distance Warcry':{ vol: 50, pan: -30 },
+    }
+  },
+};
+
+function applyPreset(key) {
+  if (!key) return;
+  const preset = PRESETS[key];
+  if (!preset) return;
+
+  // Stop all playing
+  ambientState.forEach((state, i) => {
+    if (state.playing && state.howl) {
+      state.howl.fade(state.howl.volume(), 0, 600);
+      setTimeout(() => { if(state.howl) state.howl.stop(); }, 650);
+      state.playing = false;
+      document.getElementById(`tog-${i}`).textContent = '▶';
+      document.getElementById(`tog-${i}`).classList.remove('active');
+      document.getElementById(`ch-${i}`).classList.remove('playing');
+    }
+  });
+
+  // Apply preset after fade
+  setTimeout(() => {
+    Object.entries(preset.ambients).forEach(([name, cfg]) => {
+      const idx = AMBIENT_SOUNDS.findIndex(s => {
+        // match by short display name
+        const dispName = s.name.replace(' Ambient', '').replace(' Ambient', '');
+        // compare our state names
+        return AMBIENT_SOUNDS.indexOf(s) === ambientState.findIndex((_, j) => {
+          const el = document.getElementById(`ch-${j}`);
+          return el && el.querySelector('.channel-name').textContent === name;
+        });
+      });
+      // Direct index lookup
+      const i = AMBIENT_SOUNDS.findIndex((_, j) => {
+        const nameEl = document.getElementById(`ch-${j}`)?.querySelector('.channel-name');
+        return nameEl && nameEl.textContent === name;
+      });
+      if (i < 0) return;
+      const state = ambientState[i];
+      // Update sliders
+      const volSlider = document.getElementById(`vol-${i}`);
+      const panSlider = document.getElementById(`pan-${i}`);
+      if (volSlider) { volSlider.value = cfg.vol; volSlider.dispatchEvent(new Event('input')); }
+      if (panSlider) { panSlider.value = cfg.pan; panSlider.dispatchEvent(new Event('input')); }
+      // Start playing
+      if (!state.howl) state.howl = buildAmbientHowl(AMBIENT_SOUNDS[i].file, state.vol, state.pan);
+      state.howl.volume(0);
+      state.howl.play();
+      state.howl.fade(0, state.vol * masterVolume, 1500);
+      state.playing = true;
+      document.getElementById(`tog-${i}`).textContent = '■';
+      document.getElementById(`tog-${i}`).classList.add('active');
+      document.getElementById(`ch-${i}`).classList.add('playing');
+    });
+    showToast('☠ ' + preset.name + ' ☠');
+  }, 700);
+
+  document.getElementById('preset-select').value = '';
+}
+
+document.getElementById('preset-select').addEventListener('change', function() {
+  applyPreset(this.value);
+});
+
+// ── Perils of the Warp ────────────────────
+document.getElementById('btn-perils').addEventListener('click', () => {
+  warpFlash();
+
+  // Stop all ambients
+  ambientState.forEach((state, i) => {
+    if (state.playing && state.howl) {
+      state.howl.stop();
+      state.playing = false;
+      document.getElementById(`tog-${i}`).textContent = '▶';
+      document.getElementById(`tog-${i}`).classList.remove('active');
+      document.getElementById(`ch-${i}`).classList.remove('playing');
+    }
+  });
+
+  // Random 3-6 ambients
+  const shuffled = [...Array(AMBIENT_SOUNDS.length).keys()].sort(() => Math.random() - 0.5);
+  const count = 3 + Math.floor(Math.random() * 4);
+  const chosen = shuffled.slice(0, count);
+
+  setTimeout(() => {
+    chosen.forEach(i => {
+      const state = ambientState[i];
+      const vol = 0.3 + Math.random() * 0.7;
+      const pan = (Math.random() * 2 - 1);
+      state.vol = vol;
+      state.pan = pan;
+
+      const volSlider = document.getElementById(`vol-${i}`);
+      const panSlider = document.getElementById(`pan-${i}`);
+      if (volSlider) {
+        volSlider.value = Math.round(vol * 100);
+        volSlider.style.setProperty('--val', Math.round(vol * 100) + '%');
+        document.getElementById(`vol-val-${i}`).textContent = Math.round(vol * 100) + '%';
+      }
+      if (panSlider) {
+        const pv = Math.round(pan * 100);
+        panSlider.value = pv;
+        panSlider.style.setProperty('--val', ((pv + 100) / 2) + '%');
+        const label = pv === 0 ? 'C' : (pv < 0 ? 'L' + Math.abs(pv) : 'R' + pv);
+        document.getElementById(`pan-val-${i}`).textContent = label;
+      }
+
+      if (!state.howl) state.howl = buildAmbientHowl(AMBIENT_SOUNDS[i].file, state.vol, state.pan);
+      else { state.howl.stereo(state.pan); }
+      state.howl.volume(0);
+      state.howl.play();
+      state.howl.fade(0, state.vol * masterVolume, 800);
+      state.playing = true;
+      document.getElementById(`tog-${i}`).textContent = '■';
+      document.getElementById(`tog-${i}`).classList.add('active');
+      document.getElementById(`ch-${i}`).classList.add('playing');
+    });
+
+    // Also fire a random SFX
+    const sfxIdx = Math.floor(Math.random() * SFX_SOUNDS.length);
+    fireSfx(sfxIdx);
+
+    showToast('☠ THE WARP TEARS REALITY ☠', 3000);
+  }, 300);
+});
+
+// ── Save Mix ──────────────────────────────
+document.getElementById('btn-save').addEventListener('click', () => {
+  const mix = ambientState.map((state, i) => ({
+    index: i,
+    playing: state.playing,
+    vol: state.vol,
+    pan: state.pan,
+  }));
+  const sfxMix = sfxState.map((state, i) => ({
+    index: i,
+    vol: state.vol,
+    pan: state.pan,
+  }));
+  localStorage.setItem('warhammer_boys_mix', JSON.stringify({ ambients: mix, sfx: sfxMix, master: masterVolume }));
+  showToast('☠ Mix Saved to Codex ☠');
+});
+
+// ── Load Mix ──────────────────────────────
+document.getElementById('btn-load').addEventListener('click', () => {
+  const raw = localStorage.getItem('warhammer_boys_mix');
+  if (!raw) { showToast('⚠ No saved mix found'); return; }
+  const data = JSON.parse(raw);
+
+  // Master
+  if (data.master !== undefined) {
+    masterVolume = data.master;
+    const mv = Math.round(masterVolume * 100);
+    const mvSlider = document.getElementById('master-vol');
+    mvSlider.value = mv;
+    mvSlider.style.setProperty('--val', mv + '%');
+    document.getElementById('master-vol-val').textContent = mv + '%';
+    Howler.volume(masterVolume);
+  }
+
+  // Ambients
+  data.ambients.forEach(saved => {
+    const i = saved.index;
+    const state = ambientState[i];
+    if (!state) return;
+
+    const volSlider = document.getElementById(`vol-${i}`);
+    const panSlider = document.getElementById(`pan-${i}`);
+    const pv = Math.round(saved.pan * 100);
+
+    state.vol = saved.vol;
+    state.pan = saved.pan;
+
+    if (volSlider) {
+      volSlider.value = Math.round(saved.vol * 100);
+      volSlider.style.setProperty('--val', Math.round(saved.vol * 100) + '%');
+      document.getElementById(`vol-val-${i}`).textContent = Math.round(saved.vol * 100) + '%';
+    }
+    if (panSlider) {
+      panSlider.value = pv;
+      panSlider.style.setProperty('--val', ((pv + 100) / 2) + '%');
+      const label = pv === 0 ? 'C' : (pv < 0 ? 'L' + Math.abs(pv) : 'R' + pv);
+      document.getElementById(`pan-val-${i}`).textContent = label;
+    }
+
+    if (saved.playing && !state.playing) {
+      if (!state.howl) state.howl = buildAmbientHowl(AMBIENT_SOUNDS[i].file, state.vol, state.pan);
+      state.howl.volume(0);
+      state.howl.play();
+      state.howl.fade(0, state.vol * masterVolume, 800);
+      state.playing = true;
+      document.getElementById(`tog-${i}`).textContent = '■';
+      document.getElementById(`tog-${i}`).classList.add('active');
+      document.getElementById(`ch-${i}`).classList.add('playing');
+    } else if (!saved.playing && state.playing) {
+      if (state.howl) { state.howl.stop(); }
+      state.playing = false;
+      document.getElementById(`tog-${i}`).textContent = '▶';
+      document.getElementById(`tog-${i}`).classList.remove('active');
+      document.getElementById(`ch-${i}`).classList.remove('playing');
+    }
+  });
+
+  // SFX sliders
+  if (data.sfx) {
+    data.sfx.forEach(saved => {
+      const i = saved.index;
+      const state = sfxState[i];
+      if (!state) return;
+      state.vol = saved.vol;
+      state.pan = saved.pan;
+      const volS = document.getElementById(`sfx-vol-${i}`);
+      const panS = document.getElementById(`sfx-pan-${i}`);
+      const pv   = Math.round(saved.pan * 100);
+      if (volS) { volS.value = Math.round(saved.vol*100); volS.style.setProperty('--val', Math.round(saved.vol*100)+'%'); document.getElementById(`sfx-vol-val-${i}`).textContent = Math.round(saved.vol*100)+'%'; }
+      if (panS) { panS.value = pv; panS.style.setProperty('--val', ((pv+100)/2)+'%'); const label = pv===0?'C':(pv<0?'L'+Math.abs(pv):'R'+pv); document.getElementById(`sfx-pan-val-${i}`).textContent = label; }
+    });
+  }
+
+  showToast('☠ Mix Loaded from Codex ☠');
+});
+
+// ── Keyboard shortcuts ────────────────────
+document.addEventListener('keydown', (e) => {
+  if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
+  if (e.code === 'Space') { e.preventDefault(); document.getElementById('btn-perils').click(); }
+  if (e.code === 'F1')    { e.preventDefault(); document.getElementById('btn-fade-in').click(); }
+  if (e.code === 'F2')    { e.preventDefault(); document.getElementById('btn-fade-out').click(); }
+});
+
+// ── INIT ──────────────────────────────────
+renderAmbient();
+renderSfx();
+
+showToast('☠ Warhammer Boys – Ready for War ☠', 3000);
+</script>
+</body>
+</html>
